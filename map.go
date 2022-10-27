@@ -110,9 +110,7 @@ func (m *earthMap) initMap(reader inputReader) {
 // getCity fetches a city from the city map.
 // If the city is not present, nil is returned
 func (m *earthMap) getCity(name string) *city {
-	city, _ := m.cityMap[name]
-
-	return city
+	return m.cityMap[name]
 }
 
 // addCity appends a city to the city map
@@ -183,7 +181,7 @@ func (m *earthMap) writeOutput(writer outputWriter) error {
 		}
 
 		if err := writer.write(fmt.Sprintf("%s\n", sb.String())); err != nil {
-			return fmt.Errorf("unable to write to output stream, %v", err)
+			return fmt.Errorf("unable to write to output stream, %w", err)
 		}
 	}
 

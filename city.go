@@ -90,6 +90,7 @@ func (c *city) getRandomNeighbor() *city {
 
 	// Get a random present neighbor
 	getRandCity := func() *city {
+		//nolint:gosec
 		return c.neighbors[direction(rand.Intn(numDirections))]
 	}
 

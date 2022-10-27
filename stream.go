@@ -1,3 +1,5 @@
+// TODO remove unused identifier
+//nolint:unused
 package main
 
 import (
@@ -31,7 +33,7 @@ func newFileReader(filePath string) (inputReader, error) {
 	mapFile, err := os.Open(filePath)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to open file, %v", err)
+		return nil, fmt.Errorf("unable to open file, %w", err)
 	}
 
 	fileScanner := bufio.NewScanner(mapFile)
@@ -69,7 +71,7 @@ type fileWriter struct {
 func newFileWriter(filePath string) (outputWriter, error) {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create file, %v", err)
+		return nil, fmt.Errorf("unable to create file, %w", err)
 	}
 
 	bw := bufio.NewWriter(file)
