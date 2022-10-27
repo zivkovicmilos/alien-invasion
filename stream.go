@@ -1,4 +1,3 @@
-// TODO remove unused identifier
 //nolint:unused
 package main
 
