@@ -75,6 +75,34 @@ func TestCity_AddNeighbor(t *testing.T) {
 	}
 }
 
+// TestCity_RemoveNeighbors makes sure neighbors are removed correctly
+func TestCity_RemoveNeighbors(t *testing.T) {
+	t.Parallel()
+
+	var (
+		city      = newCity("city name")
+		neighbors = generateRandomCities(numDirections)
+	)
+
+	directions := []direction{north, east, west, south}
+
+	// Add the random neighbors
+	for index, neighbor := range neighbors {
+		city.addNeighbor(directions[index], neighbor)
+	}
+
+	// Make sure the neighbors are added successfully
+	assert.Len(t, city.neighbors, len(neighbors))
+
+	// Remove every other neighbor
+	for i := 0; i < len(neighbors); i += 2 {
+		city.removeNeighbor(directions[i])
+	}
+
+	// Make sure the neighbors are removed successfully
+	assert.Len(t, city.neighbors, len(neighbors)/2)
+}
+
 func TestCity_GetRandomNeighbor(t *testing.T) {
 	t.Parallel()
 
@@ -121,5 +149,51 @@ func TestCity_GetRandomNeighbor(t *testing.T) {
 				assert.Nil(t, randomNeighbor)
 			}
 		})
+	}
+}
+
+// TestCity_Direction makes sure the direction helper methods work fine
+func TestCity_Direction(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		direction        direction
+		expectedOpposite direction
+	}{
+		{
+			north,
+			south,
+		},
+		{
+			south,
+			north,
+		},
+		{
+			east,
+			west,
+		},
+		{
+			west,
+			east,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+
+		t.Run(
+			fmt.Sprintf(
+				"opposite direction of %s",
+				testCase.direction.getName(),
+			), func(t *testing.T) {
+				t.Parallel()
+
+				assert.Equal(
+					t,
+					testCase.expectedOpposite,
+					testCase.direction.getOpposite(),
+				)
+			},
+		)
 	}
 }

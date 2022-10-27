@@ -19,6 +19,35 @@ const (
 	west
 )
 
+// getOpposite returns the opposite direction for the given
+// direction
+func (d direction) getOpposite() direction {
+	switch d {
+	case north:
+		return south
+	case south:
+		return north
+	case east:
+		return west
+	default:
+		return east
+	}
+}
+
+// getName returns the name of the given direction
+func (d direction) getName() string {
+	switch d {
+	case north:
+		return "north"
+	case south:
+		return "south"
+	case east:
+		return "east"
+	default:
+		return "west"
+	}
+}
+
 // neighbors holds information on the adjacent cities
 type neighbors map[direction]*city
 
@@ -40,6 +69,12 @@ func newCity(name string) *city {
 // Additionally, it overwrites the previous neighbor entry, if any
 func (c *city) addNeighbor(direction direction, city *city) {
 	c.neighbors[direction] = city
+}
+
+// removeNeighbor removes a neighboring city in the
+// specified direction
+func (c *city) removeNeighbor(direction direction) {
+	delete(c.neighbors, direction)
 }
 
 // getRandomNeighbor returns a random city neighbor that is present.
