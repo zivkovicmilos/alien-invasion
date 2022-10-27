@@ -44,6 +44,7 @@ func TestMap_InitMap(t *testing.T) {
 		cityInputs = []string{
 			"Foo north=Bar west=Baz south=Qu-ux",
 			"Bar south=Foo west=Bee",
+			"", // invalid input line
 		}
 
 		expectedCities = []struct {
@@ -114,4 +115,55 @@ func TestMap_InitMap(t *testing.T) {
 			assert.Equal(t, expectedNeighbor.name, city.neighbors[expectedDirection].name)
 		}
 	}
+}
+
+// TestMap_RemoveCity makes sure cities are properly removed
+func TestMap_RemoveCity(t *testing.T) {
+	t.Parallel()
+
+	var (
+		cityInputs = []string{
+			"Foo north=Bar",
+			"Bar south=Foo",
+		}
+
+		expectedCities = []struct {
+			name      string
+			neighbors neighbors
+		}{
+			{
+				"Bar",
+				neighbors{}, // no neighbors as Foo should be removed
+			},
+		}
+	)
+
+	// Create a mock input reader
+	reader := newArrayReader(cityInputs)
+
+	// Create an instance of the earth map
+	earthMap := newEarthMap(hclog.NewNullLogger())
+
+	// Initialize the earth map using the reader
+	earthMap.initMap(reader)
+
+	// Make sure the cities are properly added
+	assert.Len(t, earthMap.cityMap, 2)
+
+	// Remove a valid city
+	earthMap.removeCity("Foo")
+
+	// Attempt to remove an invalid city (no effect)
+	earthMap.removeCity("Foo 2")
+
+	// Make sure the city was removed
+	assert.Len(t, earthMap.cityMap, 1)
+
+	cityBar := earthMap.getCity(expectedCities[0].name)
+	if cityBar == nil {
+		t.Fatalf("city %s not present in city map", expectedCities[0].name)
+	}
+
+	// Make sure the city's neighbors are correct
+	assert.Len(t, cityBar.neighbors, len(expectedCities[0].neighbors))
 }

@@ -139,7 +139,7 @@ func (m *earthMap) removeCity(name string) {
 
 	// Remove the city from the reference of all neighbors
 	for direction, neighbor := range neighbors {
-		neighbor.removeNeighbor(direction)
+		neighbor.removeNeighbor(direction.getOpposite())
 	}
 }
 
