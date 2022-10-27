@@ -1,0 +1,16 @@
+# Environment variables
+.env
+
+# Editors
+.idea
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Binaries
+*.exe
+*.exe~
+
+# Test binary, built with `go test -c`
+*.test
