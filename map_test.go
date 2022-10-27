@@ -224,7 +224,22 @@ func TestMap_WriteOutput(t *testing.T) {
 	// in this test case
 	assert.Len(t, writer.outputArray, len(cityInputs))
 
-	for index, outputLine := range writer.outputArray {
-		assert.Equal(t, fmt.Sprintf("%s\n", cityInputs[index]), outputLine)
+	for _, outputLine := range writer.outputArray {
+		// Make sure the output exactly matches one of the inputs
+		// as nothing is unchanged in the map
+		matchFound := false
+
+		for _, input := range cityInputs {
+			if fmt.Sprintf("%s\n", input) == outputLine {
+				matchFound = true
+
+				break
+			}
+		}
+
+		// Check if a match has been found in the output
+		if !matchFound {
+			t.Fatalf("input line is not present in output, %s", outputLine)
+		}
 	}
 }
