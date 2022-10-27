@@ -52,17 +52,25 @@ func (m *earthMap) initMap(reader mapReader) {
 	directions := []direction{north, south, east, west}
 
 	// Read each city from the input stream, until it is depleted
-	for cityLine := reader.readCity(); cityLine != ""; {
+	for reader.hasMoreCities() {
+		cityLine := reader.readCity()
+
 		// Grab the city name
 		cityNameMatch := cityNameRegex.FindStringSubmatch(cityLine)
 		if len(cityNameMatch) == 0 {
-			m.log.Error(fmt.Sprintf("Invalid city input line: %s", cityLine))
+			// The assumption is that invalid city lines are skipped
+			m.log.Error(
+				fmt.Sprintf("Invalid city input line: %s", cityLine),
+			)
 
 			continue
 		}
 
 		// Create a new instance of a city
 		city := newCity(cityNameMatch[0])
+
+		// Add the current city to the earth map
+		m.addCity(city)
 
 		// Check if there are neighboring cities from the input line
 		for _, direction := range directions {
@@ -93,7 +101,9 @@ func (m *earthMap) initMap(reader mapReader) {
 		}
 	}
 
-	m.log.Info(fmt.Sprintf("Map initialized with %d cities", len(m.cityMap)))
+	m.log.Info(
+		fmt.Sprintf("Map initialized with %d cities", len(m.cityMap)),
+	)
 }
 
 // getCity fetches a city from the city map.

@@ -8,8 +8,11 @@ import (
 
 // mapReader defines the base map reader interface
 type mapReader interface {
-	// readCity reads a single city line from the map.
-	// Returns "" if no input cities are present
+	// hasMoreCities returns a status indicating if there are more cities
+	// to parse
+	hasMoreCities() bool
+
+	// readCity reads a single city line from the map
 	readCity() string
 
 	// close closes the map reader
@@ -40,14 +43,12 @@ func newFileReader(filePath string) (mapReader, error) {
 	}, nil
 }
 
-func (fr *fileReader) readCity() string {
-	// Check if there are leftover lines to read
-	if fr.fileScanner.Scan() {
-		return fr.fileScanner.Text()
-	}
+func (fr *fileReader) hasMoreCities() bool {
+	return fr.fileScanner.Scan()
+}
 
-	// End of file is reached
-	return ""
+func (fr *fileReader) readCity() string {
+	return fr.fileScanner.Text()
 }
 
 func (fr *fileReader) close() error {
