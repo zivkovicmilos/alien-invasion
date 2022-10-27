@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -48,7 +49,7 @@ func newEarthMap(log hclog.Logger) *earthMap {
 }
 
 // initMap initializes the city map using the specified reader
-func (m *earthMap) initMap(reader mapReader) {
+func (m *earthMap) initMap(reader inputReader) {
 	directions := []direction{north, south, east, west}
 
 	// Read each city from the input stream, until it is depleted
@@ -157,4 +158,34 @@ func (m *earthMap) getOrAddCity(name string) *city {
 	}
 
 	return city
+}
+
+// writeOutput writes the current map layout to the specified
+// output stream. It assumes that the output order is not important
+func (m *earthMap) writeOutput(writer outputWriter) error {
+	// Each city has an output format:
+	// CityName direction=CityName...
+	for _, city := range m.cityMap {
+		var sb strings.Builder
+
+		// Write the city name
+		sb.WriteString(fmt.Sprintf("%s ", city.name))
+
+		// For each direction, write the neighbor with the direction
+		for direction, neighbor := range city.neighbors {
+			sb.WriteString(
+				fmt.Sprintf(
+					"%s=%s",
+					direction.getName(),
+					neighbor.name,
+				),
+			)
+		}
+
+		if err := writer.write(fmt.Sprintf("%s\n", sb.String())); err != nil {
+			return fmt.Errorf("unable to write to output stream, %v", err)
+		}
+	}
+
+	return nil
 }

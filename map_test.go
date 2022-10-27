@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
@@ -13,7 +14,7 @@ type arrayReader struct {
 	index     int
 }
 
-func newArrayReader(cityArray []string) mapReader {
+func newArrayReader(cityArray []string) inputReader {
 	return &arrayReader{
 		cityArray: cityArray,
 		index:     0,
@@ -32,6 +33,30 @@ func (ar *arrayReader) readCity() string {
 }
 
 func (ar *arrayReader) close() error {
+	return nil
+}
+
+type arrayWriter struct {
+	outputArray []string
+}
+
+func newArrayWriter() *arrayWriter {
+	return &arrayWriter{
+		outputArray: make([]string, 0),
+	}
+}
+
+func (aw *arrayWriter) write(s string) error {
+	aw.outputArray = append(aw.outputArray, s)
+
+	return nil
+}
+
+func (aw *arrayWriter) flush() error {
+	return nil
+}
+
+func (aw *arrayWriter) close() error {
 	return nil
 }
 
@@ -166,4 +191,40 @@ func TestMap_RemoveCity(t *testing.T) {
 
 	// Make sure the city's neighbors are correct
 	assert.Len(t, cityBar.neighbors, len(expectedCities[0].neighbors))
+}
+
+// TestMap_WriteOutput checks that the map output is valid
+func TestMap_WriteOutput(t *testing.T) {
+	t.Parallel()
+
+	cityInputs := []string{
+		"Foo north=Bar",
+		"Bar south=Foo",
+	}
+
+	// Create a mock input reader
+	reader := newArrayReader(cityInputs)
+
+	// Create an instance of the earth map
+	earthMap := newEarthMap(hclog.NewNullLogger())
+
+	// Initialize the earth map using the reader
+	earthMap.initMap(reader)
+
+	// Make sure the cities are properly added
+	assert.Len(t, earthMap.cityMap, 2)
+
+	// Create a mock output writer
+	writer := newArrayWriter()
+
+	// Write the output
+	assert.NoError(t, earthMap.writeOutput(writer))
+
+	// Make sure the output is the same as the input
+	// in this test case
+	assert.Len(t, writer.outputArray, len(cityInputs))
+
+	for index, outputLine := range writer.outputArray {
+		assert.Equal(t, fmt.Sprintf("%s\n", cityInputs[index]), outputLine)
+	}
 }

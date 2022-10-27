@@ -6,8 +6,8 @@ import (
 	"os"
 )
 
-// mapReader defines the base map reader interface
-type mapReader interface {
+// inputReader defines the base map reader interface
+type inputReader interface {
 	// hasMoreCities returns a status indicating if there are more cities
 	// to parse
 	hasMoreCities() bool
@@ -27,7 +27,7 @@ type fileReader struct {
 }
 
 // newFileReader creates a new instance of the file reader
-func newFileReader(filePath string) (mapReader, error) {
+func newFileReader(filePath string) (inputReader, error) {
 	mapFile, err := os.Open(filePath)
 
 	if err != nil {
@@ -53,4 +53,43 @@ func (fr *fileReader) readCity() string {
 
 func (fr *fileReader) close() error {
 	return fr.mapFile.Close()
+}
+
+type outputWriter interface {
+	write(string) error
+	flush() error
+	close() error
+}
+
+type fileWriter struct {
+	outputFile     *os.File
+	bufferedWriter *bufio.Writer
+}
+
+func newFileWriter(filePath string) (outputWriter, error) {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create file, %v", err)
+	}
+
+	bw := bufio.NewWriter(file)
+
+	return &fileWriter{
+		outputFile:     file,
+		bufferedWriter: bw,
+	}, nil
+}
+
+func (fw *fileWriter) write(s string) error {
+	_, err := fw.bufferedWriter.WriteString(s)
+
+	return err
+}
+
+func (fw *fileWriter) close() error {
+	return fw.outputFile.Close()
+}
+
+func (fw *fileWriter) flush() error {
+	return fw.bufferedWriter.Flush()
 }
