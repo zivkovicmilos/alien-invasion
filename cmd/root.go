@@ -6,7 +6,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
+	"github.com/zivkovicmilos/alien-invasion/game"
+	"github.com/zivkovicmilos/alien-invasion/stream"
 )
 
 var (
@@ -107,7 +110,46 @@ func runPreRun(_ *cobra.Command, args []string) error {
 
 // runCommand runs the root command
 func runCommand(_ *cobra.Command, _ []string) error {
-	fmt.Println("Hello!")
+	// Create an instance of the logger
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "alien-invasion",
+		Level: hclog.LevelFromString(params.logLevel),
+	})
+
+	// Create an instance of the Earth map
+	earthMap := game.NewEarthMap(logger)
+
+	// Create an instance of the file reader
+	fileReader, err := stream.NewFileReader(params.mapPath)
+	if err != nil {
+		return fmt.Errorf("unable to create a file reader, %w", err)
+	}
+
+	// Init the map from the map file
+	earthMap.InitMap(fileReader)
+
+	// Start the invasion
+	if err := earthMap.StartInvasion(params.n); err != nil {
+		return fmt.Errorf("unable to simulate invasion, %w", err)
+	}
+
+	// Set up the output writer
+	writer := stream.NewConsoleWriter()
+	if params.outputPath != "" {
+		// Output file is set, make sure it is valid
+		writer, err = stream.NewFileWriter(params.outputPath)
+
+		if err != nil {
+			return fmt.Errorf("unable to create an output file, %w", err)
+		}
+	}
+
+	// Write the invasion output to the file
+	if err := earthMap.WriteOutput(writer); err != nil {
+		return fmt.Errorf("unable to write output to file, %w", err)
+	}
+
+	logger.Info("Invasion completed successfully!")
 
 	return nil
 }

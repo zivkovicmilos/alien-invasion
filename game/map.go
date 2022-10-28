@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/zivkovicmilos/alien-invasion/stream"
 )
 
 // Predefined regexes for reading the input line
@@ -33,28 +34,28 @@ func getDirectionRegex(direction direction) *regexp.Regexp {
 	}
 }
 
-// earthMap keeps track of all active Earth cities
-type earthMap struct {
+// EarthMap keeps track of all active Earth cities
+type EarthMap struct {
 	log hclog.Logger
 
 	cityMap map[string]*city
 }
 
-// newEarthMap creates a new instance of the earth map
-func newEarthMap(log hclog.Logger) *earthMap {
-	return &earthMap{
+// NewEarthMap creates a new instance of the earth map
+func NewEarthMap(log hclog.Logger) *EarthMap {
+	return &EarthMap{
 		log:     log,
 		cityMap: make(map[string]*city),
 	}
 }
 
-// initMap initializes the city map using the specified reader
-func (m *earthMap) initMap(reader inputReader) {
+// InitMap initializes the city map using the specified reader
+func (m *EarthMap) InitMap(reader stream.InputReader) {
 	directions := []direction{north, south, east, west}
 
 	// Read each city from the input stream, until it is depleted
-	for reader.hasMoreCities() {
-		cityLine := reader.readCity()
+	for reader.HasMoreCities() {
+		cityLine := reader.ReadCity()
 
 		// Grab the city name
 		cityNameMatch := cityNameRegex.FindStringSubmatch(cityLine)
@@ -109,17 +110,17 @@ func (m *earthMap) initMap(reader inputReader) {
 
 // getCity fetches a city from the city map.
 // If the city is not present, nil is returned
-func (m *earthMap) getCity(name string) *city {
+func (m *EarthMap) getCity(name string) *city {
 	return m.cityMap[name]
 }
 
 // addCity appends a city to the city map
-func (m *earthMap) addCity(newCity *city) {
+func (m *EarthMap) addCity(newCity *city) {
 	m.cityMap[newCity.name] = newCity
 }
 
 // removeCity removes the city from the city map
-func (m *earthMap) removeCity(name string) {
+func (m *EarthMap) removeCity(name string) {
 	// Grab the city
 	city := m.getCity(name)
 	if city == nil {
@@ -145,7 +146,7 @@ func (m *earthMap) removeCity(name string) {
 // getOrAddCity attempts to fetch a city from the city map.
 // If the city is not present, it is created, appended to the city map
 // and returned
-func (m *earthMap) getOrAddCity(name string) *city {
+func (m *EarthMap) getOrAddCity(name string) *city {
 	city := m.getCity(name)
 
 	if city == nil {
@@ -158,9 +159,9 @@ func (m *earthMap) getOrAddCity(name string) *city {
 	return city
 }
 
-// writeOutput writes the current map layout to the specified
+// WriteOutput writes the current map layout to the specified
 // output stream. It assumes that the output order is not important
-func (m *earthMap) writeOutput(writer outputWriter) error {
+func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 	// Each city has an output format:
 	// CityName direction=CityName...
 	for _, city := range m.cityMap {
@@ -180,10 +181,16 @@ func (m *earthMap) writeOutput(writer outputWriter) error {
 			)
 		}
 
-		if err := writer.write(fmt.Sprintf("%s\n", sb.String())); err != nil {
+		if err := writer.Write(fmt.Sprintf("%s\n", sb.String())); err != nil {
 			return fmt.Errorf("unable to write to output stream, %w", err)
 		}
 	}
 
+	return nil
+}
+
+// StartInvasion starts the invasion simulation using the provided number of aliens
+func (m *EarthMap) StartInvasion(numAliens int) error {
+	// TODO
 	return nil
 }

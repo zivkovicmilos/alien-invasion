@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/zivkovicmilos/alien-invasion/stream"
 )
 
 // arrayReader is a simple city array input reader used for testing
@@ -14,25 +15,25 @@ type arrayReader struct {
 	index     int
 }
 
-func newArrayReader(cityArray []string) inputReader {
+func newArrayReader(cityArray []string) stream.InputReader {
 	return &arrayReader{
 		cityArray: cityArray,
 		index:     0,
 	}
 }
 
-func (ar *arrayReader) hasMoreCities() bool {
+func (ar *arrayReader) HasMoreCities() bool {
 	return ar.index < len(ar.cityArray)
 }
 
-func (ar *arrayReader) readCity() string {
+func (ar *arrayReader) ReadCity() string {
 	line := ar.cityArray[ar.index]
 	ar.index++
 
 	return line
 }
 
-func (ar *arrayReader) close() error {
+func (ar *arrayReader) Close() error {
 	return nil
 }
 
@@ -46,17 +47,17 @@ func newArrayWriter() *arrayWriter {
 	}
 }
 
-func (aw *arrayWriter) write(s string) error {
+func (aw *arrayWriter) Write(s string) error {
 	aw.outputArray = append(aw.outputArray, s)
 
 	return nil
 }
 
-func (aw *arrayWriter) flush() error {
+func (aw *arrayWriter) Flush() error {
 	return nil
 }
 
-func (aw *arrayWriter) close() error {
+func (aw *arrayWriter) Close() error {
 	return nil
 }
 
@@ -116,10 +117,10 @@ func TestMap_InitMap(t *testing.T) {
 	reader := newArrayReader(cityInputs)
 
 	// Create an instance of the earth map
-	earthMap := newEarthMap(hclog.NewNullLogger())
+	earthMap := NewEarthMap(hclog.NewNullLogger())
 
 	// Initialize the earth map using the reader
-	earthMap.initMap(reader)
+	earthMap.InitMap(reader)
 
 	// Make sure the cities are properly added
 	assert.Len(t, earthMap.cityMap, len(expectedCities))
@@ -167,10 +168,10 @@ func TestMap_RemoveCity(t *testing.T) {
 	reader := newArrayReader(cityInputs)
 
 	// Create an instance of the earth map
-	earthMap := newEarthMap(hclog.NewNullLogger())
+	earthMap := NewEarthMap(hclog.NewNullLogger())
 
 	// Initialize the earth map using the reader
-	earthMap.initMap(reader)
+	earthMap.InitMap(reader)
 
 	// Make sure the cities are properly added
 	assert.Len(t, earthMap.cityMap, 2)
@@ -206,10 +207,10 @@ func TestMap_WriteOutput(t *testing.T) {
 	reader := newArrayReader(cityInputs)
 
 	// Create an instance of the earth map
-	earthMap := newEarthMap(hclog.NewNullLogger())
+	earthMap := NewEarthMap(hclog.NewNullLogger())
 
 	// Initialize the earth map using the reader
-	earthMap.initMap(reader)
+	earthMap.InitMap(reader)
 
 	// Make sure the cities are properly added
 	assert.Len(t, earthMap.cityMap, 2)
@@ -218,7 +219,7 @@ func TestMap_WriteOutput(t *testing.T) {
 	writer := newArrayWriter()
 
 	// Write the output
-	assert.NoError(t, earthMap.writeOutput(writer))
+	assert.NoError(t, earthMap.WriteOutput(writer))
 
 	// Make sure the output is the same as the input
 	// in this test case
