@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -21,6 +22,11 @@ var (
 	southRegex = regexp.MustCompile(`south=([^ ]+)`)
 	eastRegex  = regexp.MustCompile(`east=([^ ]+)`)
 	westRegex  = regexp.MustCompile(`west=([^ ]+)`)
+)
+
+// Defines the max move count for each alien on the map
+const (
+	maxMoveCount = 10000
 )
 
 // getDirectionRegex returns the specific direction regex for the input line
@@ -72,7 +78,8 @@ func (m *EarthMap) InitMap(reader stream.InputReader) {
 		}
 
 		// Create a new instance of a city
-		city := newCity(cityNameMatch[0])
+		cityName := cityNameMatch[0]
+		city := newCity(cityName, withLogger(m.log.Named(cityName)))
 
 		// Add the current city to the earth map
 		m.addCity(city)
@@ -154,7 +161,7 @@ func (m *EarthMap) getOrAddCity(name string) *city {
 
 	if city == nil {
 		// City not created yet, add it
-		city = newCity(name)
+		city = newCity(name, withLogger(m.log.Named(name)))
 
 		m.addCity(city)
 	}
@@ -200,16 +207,22 @@ func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 //    - all aliens are dead
 //    - all aliens moved at least 10k times (solves the "trapped" scenarios)
 //    - the user terminated the program with an exit signal (CTRL-C)
+// 4. Prune out destroyed cities from the map
 func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 	// Randomly assign starting positions for aliens
-	_ = m.getRandomCities(numAliens)
+	randomCities := m.getRandomCities(numAliens)
 
 	// Set the aliens loose on the Earth map
 	var (
 		aliensLeft       = numAliens
 		movesCompletedCh = make(chan struct{})
 		alienKilledCh    = make(chan struct{})
+
+		wg sync.WaitGroup
 	)
+
+	workerContext, cancelFn := context.WithCancel(ctx)
+	defer cancelFn()
 
 	// Cleanup
 	defer func() {
@@ -217,7 +230,29 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 		close(movesCompletedCh)
 	}()
 
-	// TODO
+	// Start the alien run loops
+	for i := 0; i < numAliens; i++ {
+		go func(ctx context.Context, id int, startingCity *city) {
+			defer func() {
+				wg.Done()
+			}()
+
+			newAlien(id, m.log).runAlien(
+				workerContext,
+				startingCity,
+				movesCompletedCh,
+				alienKilledCh,
+			)
+		}(workerContext, i, randomCities[i])
+	}
+
+	// Prune out the destroyed cities
+	m.log.Info(
+		fmt.Sprintf(
+			"A total of %d cities were destroyed!",
+			m.pruneDestroyedCities(),
+		),
+	)
 
 	// Wait until the program terminates
 	for {
@@ -225,6 +260,11 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 		case <-ctx.Done():
 			// User stopped the program
 			m.log.Info("Shutdown signal caught...")
+
+			// Close off the alien routines, and wait
+			// for them to complete gracefully
+			cancelFn()
+			wg.Wait()
 
 			return nil
 		case <-movesCompletedCh:
@@ -274,4 +314,19 @@ func (m *EarthMap) getRandomCities(numCities int) []*city {
 	}
 
 	return randomCities
+}
+
+// pruneDestroyedCities removes destroyed cities from the earth map.
+// Returns the number of pruned destroyed cities
+func (m *EarthMap) pruneDestroyedCities() int {
+	destroyed := 0
+	for _, city := range m.cityMap {
+		// Prune out any destroyed cities
+		if city.destroyed {
+			m.removeCity(city.name)
+			destroyed++
+		}
+	}
+
+	return destroyed
 }
