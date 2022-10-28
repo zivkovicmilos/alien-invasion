@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
-	"github.com/zivkovicmilos/alien-invasion"
 )
 
 // arrayReader is a simple city array input reader used for testing
@@ -15,7 +14,7 @@ type arrayReader struct {
 	index     int
 }
 
-func newArrayReader(cityArray []string) main.inputReader {
+func newArrayReader(cityArray []string) inputReader {
 	return &arrayReader{
 		cityArray: cityArray,
 		index:     0,
