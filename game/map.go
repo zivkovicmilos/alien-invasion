@@ -1,9 +1,12 @@
 package game
 
 import (
+	"context"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/zivkovicmilos/alien-invasion/stream"
@@ -44,7 +47,7 @@ type EarthMap struct {
 // NewEarthMap creates a new instance of the earth map
 func NewEarthMap(log hclog.Logger) *EarthMap {
 	return &EarthMap{
-		log:     log,
+		log:     log.Named("earth-map"),
 		cityMap: make(map[string]*city),
 	}
 }
@@ -189,8 +192,86 @@ func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 	return nil
 }
 
-// StartInvasion starts the invasion simulation using the provided number of aliens
-func (m *EarthMap) StartInvasion(numAliens int) error {
+// StartInvasion starts the invasion simulation using the provided number of aliens.
+// The invasion consists of a few steps:
+// 1. Randomly assign starting positions for aliens
+// 2. Set the aliens loose on the Earth map
+// 3. Wait until the program terminates (either):
+//    - all aliens are dead
+//    - all aliens moved at least 10k times (solves the "trapped" scenarios)
+//    - the user terminated the program with an exit signal (CTRL-C)
+func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
+	// Randomly assign starting positions for aliens
+	_ = m.getRandomCities(numAliens)
+
+	// Set the aliens loose on the Earth map
+	var (
+		aliensLeft       = numAliens
+		movesCompletedCh = make(chan struct{})
+		alienKilledCh    = make(chan struct{})
+	)
+
+	// Cleanup
+	defer func() {
+		close(alienKilledCh)
+		close(movesCompletedCh)
+	}()
+
 	// TODO
-	return nil
+
+	// Wait until the program terminates
+	for {
+		select {
+		case <-ctx.Done():
+			// User stopped the program
+			m.log.Info("Shutdown signal caught...")
+
+			return nil
+		case <-movesCompletedCh:
+			// An alien has reached the max number of moves
+			aliensLeft--
+
+			if aliensLeft == 0 {
+				m.log.Info("The final alien moved 10k times")
+
+				return nil
+			}
+		case <-alienKilledCh:
+			// An alien has been killed
+			aliensLeft--
+
+			if aliensLeft == 0 {
+				m.log.Info("The final alien has been killed")
+
+				return nil
+			}
+		}
+	}
+}
+
+// getRandomCities fetches random cities from the earth map
+func (m *EarthMap) getRandomCities(numCities int) []*city {
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Gather the cities (keys)
+	var (
+		totalCities = len(m.cityMap)
+		cities      = make([]string, totalCities)
+		index       = 0
+	)
+
+	for city := range m.cityMap {
+		cities[index] = city
+		index++
+	}
+
+	// Randomly distribute the cities
+	randomCities := make([]*city, numCities)
+	for i := 0; i < numCities; i++ {
+		//nolint:gosec
+		randomCities[i] = m.cityMap[cities[rand.Intn(totalCities)]]
+	}
+
+	return randomCities
 }

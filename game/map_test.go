@@ -244,3 +244,35 @@ func TestMap_WriteOutput(t *testing.T) {
 		}
 	}
 }
+
+// TestMap_GetRandomCities makes sure random cities are properly sampled
+// from the earth map
+func TestMap_GetRandomCities(t *testing.T) {
+	t.Parallel()
+
+	cityInputs := []string{
+		"Foo",
+		"Bar",
+		"Baz",
+	}
+
+	// Create a mock input reader
+	reader := newArrayReader(cityInputs)
+
+	// Create an instance of the earth map
+	earthMap := NewEarthMap(hclog.NewNullLogger())
+
+	// Initialize the earth map using the reader
+	earthMap.InitMap(reader)
+
+	// Get the random cities
+	randomCount := 10
+	randomCities := earthMap.getRandomCities(randomCount)
+
+	// Make sure the random cities are valid
+	assert.Len(t, randomCities, randomCount)
+
+	for _, randomCity := range randomCities {
+		assert.Equal(t, earthMap.cityMap[randomCity.name], randomCity)
+	}
+}

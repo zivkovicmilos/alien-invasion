@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -129,7 +130,7 @@ func runCommand(_ *cobra.Command, _ []string) error {
 	earthMap.InitMap(fileReader)
 
 	// Start the invasion
-	if err := earthMap.StartInvasion(params.n); err != nil {
+	if err := earthMap.StartInvasion(context.Background(), params.n); err != nil {
 		return fmt.Errorf("unable to simulate invasion, %w", err)
 	}
 
