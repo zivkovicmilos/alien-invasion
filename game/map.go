@@ -1,4 +1,4 @@
-package main
+package game
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/zivkovicmilos/alien-invasion"
 )
 
 // Predefined regexes for reading the input line
@@ -49,7 +50,7 @@ func newEarthMap(log hclog.Logger) *earthMap {
 }
 
 // initMap initializes the city map using the specified reader
-func (m *earthMap) initMap(reader inputReader) {
+func (m *earthMap) initMap(reader main.inputReader) {
 	directions := []direction{north, south, east, west}
 
 	// Read each city from the input stream, until it is depleted
@@ -160,7 +161,7 @@ func (m *earthMap) getOrAddCity(name string) *city {
 
 // writeOutput writes the current map layout to the specified
 // output stream. It assumes that the output order is not important
-func (m *earthMap) writeOutput(writer outputWriter) error {
+func (m *earthMap) writeOutput(writer main.outputWriter) error {
 	// Each city has an output format:
 	// CityName direction=CityName...
 	for _, city := range m.cityMap {
