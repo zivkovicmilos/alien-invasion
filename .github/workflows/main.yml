@@ -35,6 +35,9 @@ jobs:
         run: go test -coverprofile coverage.out -timeout 5m ./...
 
       - name: Upload coverage file to Codecov
+        shell: bash
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
           curl -Os https://uploader.codecov.io/latest/linux/codecov
           chmod +x codecov
