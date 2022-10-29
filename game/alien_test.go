@@ -114,6 +114,7 @@ func TestAlien_AlienKilled_CityNotAccessible(t *testing.T) {
 
 	// Create a listener thread
 	wg.Add(1)
+
 	go func() {
 		defer func() {
 			wg.Done()
@@ -167,6 +168,7 @@ func TestAlien_AlienKilled_MaxMovesReached(t *testing.T) {
 
 	// Create a listener thread
 	wg.Add(1)
+
 	go func() {
 		defer func() {
 			wg.Done()
@@ -217,6 +219,7 @@ func TestAlien_AlienKilled_CityInvaded(t *testing.T) {
 
 	// Create a listener thread
 	wg.Add(1)
+
 	go func() {
 		defer func() {
 			wg.Done()
