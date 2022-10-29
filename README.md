@@ -4,8 +4,8 @@
 [![.github/workflows/main.yml](https://github.com/zivkovicmilos/alien-invasion/actions/workflows/main.yml/badge.svg)](https://github.com/zivkovicmilos/alien-invasion/actions/workflows/main.yml)
 
 `alien-invasion` is a simple game that simulates an alien invasion on Earth. The rules of the game are relatively
-simple,
-the user provides an input map containing the cities on Earth, and specifies the number of aliens for the simulation.
+simple. The user provides an input map containing the cities on Earth, and specifies the number of aliens for the
+simulation.
 Once the aliens are unleashed, they randomly move between cities and, if two aliens encounter each other, they destroy
 the city and die.
 
@@ -25,6 +25,21 @@ Flags:
       --log-level string     The log level for the program execution (default "INFO")
       --map-path string      The path to the input map file of the Earth
       --output-path string   The path to output the Earth map after the invasion. If omitted, the output is directed to the console
+```
+
+Running a simulation with `3` aliens using the map example below in [the input section](#input):
+
+```
+$ alien-invasion 3 --map-path ./mapfile.txt
+2022-10-29T19:11:38.272+0200 [INFO]  alien-invasion.earth-map: Map initialized with 5 cities
+2022-10-29T19:11:38.273+0200 [INFO]  alien-invasion.earth-map.Bar: City has been destroyed by aliens 1 and 2!
+2022-10-29T19:11:38.361+0200 [INFO]  alien-invasion.earth-map: The final alien moved 10k times
+2022-10-29T19:11:38.361+0200 [INFO]  alien-invasion.earth-map: A total of 1 cities were destroyed
+Foo south=Qu-ux west=Baz
+Qu-ux north=Foo
+Baz east=Foo
+Bee
+2022-10-29T19:11:38.361+0200 [INFO]  alien-invasion: Invasion completed successfully!
 ```
 
 ### Input
