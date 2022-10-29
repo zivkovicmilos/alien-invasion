@@ -276,3 +276,103 @@ func TestMap_GetRandomCities(t *testing.T) {
 		assert.Equal(t, earthMap.cityMap[randomCity.name], randomCity)
 	}
 }
+
+// TestMap_PruneDestroyedCities verifies the city pruning
+// functionality from the earth map
+func TestMap_PruneDestroyedCities(t *testing.T) {
+	t.Parallel()
+
+	// Create two neighboring cities, one destroyed,
+	// and one in-tact
+	var (
+		cityFoo = newCity("Foo")
+		cityBar = newCity("Bar")
+	)
+
+	cityFoo.destroyed = true
+	cityFoo.neighbors = neighbors{
+		north: cityBar,
+	}
+
+	cityBar.neighbors = neighbors{
+		south: cityFoo,
+	}
+
+	testTable := []struct {
+		name   string
+		cities []*city
+
+		expectedCities     []*city
+		expectedPruneCount int
+	}{
+		{
+			"no cities to prune",
+			[]*city{
+				{
+					name: "name",
+				},
+			},
+			[]*city{
+				{
+					name: "name",
+				},
+			},
+			0,
+		},
+		{
+			"valid city prune",
+			[]*city{
+				cityFoo, // should get pruned out
+				cityBar,
+			},
+			[]*city{
+				{
+					name:      "Bar",
+					neighbors: neighbors{}, // no neighbors
+				},
+			},
+			1,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := NewEarthMap(hclog.NewNullLogger())
+
+			// Add initial cities
+			for _, city := range testCase.cities {
+				m.cityMap[city.name] = city
+			}
+
+			// Make sure all initial cities are present
+			assert.Len(t, m.cityMap, len(testCase.cities))
+
+			// Prune the destroyed cities
+			assert.Equal(t, testCase.expectedPruneCount, m.pruneDestroyedCities())
+
+			// Make sure the earth map matches the expected one
+			// after pruning
+			assert.Len(t, m.cityMap, len(testCase.expectedCities))
+
+			for _, expectedCity := range testCase.expectedCities {
+				city := m.cityMap[expectedCity.name]
+
+				// Make sure it exists in the earth map
+				if city == nil {
+					t.Fatalf("City with name %s not present", expectedCity.name)
+				}
+
+				// Make sure the neighbors are the same
+				assert.Len(t, city.neighbors, len(expectedCity.neighbors))
+
+				for direction, neighbor := range city.neighbors {
+					assert.Equal(t, expectedCity.neighbors[direction].name, neighbor.name)
+				}
+			}
+		})
+	}
+}
