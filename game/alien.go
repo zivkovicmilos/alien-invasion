@@ -22,12 +22,11 @@ func newAlien(id int) *alien {
 func (a *alien) runAlien(
 	ctx context.Context,
 	startingCity *city,
-	movesCompletedCh chan<- struct{},
-	alienKilledCh chan<- struct{},
+	doneCh chan<- struct{},
 ) {
 	var (
-		moveCount = 0
-		nextCity  = startingCity
+		moveCount   = 0
+		currentCity = startingCity
 	)
 
 	for {
@@ -35,30 +34,40 @@ func (a *alien) runAlien(
 		case <-ctx.Done():
 			return
 		default:
-			// Check if the current city has been destroyed
-			if !nextCity.isAccessible() {
-				notifyCh(ctx, alienKilledCh)
+			// Attempt to lay siege to a random neighbor
+			siegedNeighbor := a.siegeRandomNeighbor(currentCity)
+			if siegedNeighbor == nil {
+				// No neighbor can be sieged, the alien dies
+				notifyCh(ctx, doneCh)
 
 				return
 			}
+
+			// Check if the current city can be left
+			if !currentCity.removeInvader(a.id) {
+				// The alien cannot leave the current city because it
+				// has been killed, remove the siege from the neighbor
+				siegedNeighbor.liftSiege(a.id)
+
+				notifyCh(ctx, doneCh)
+
+				return
+			}
+
+			currentCity = siegedNeighbor
+
+			// Invade the sieged neighbor
+			currentCity.addInvader(a.id)
+
+			// Increase the movement counter
+			moveCount++
 
 			// Check if max moves have been reached
 			if moveCount >= maxMoveCount {
-				notifyCh(ctx, movesCompletedCh)
+				notifyCh(ctx, doneCh)
 
 				return
 			}
-
-			// Attempt to move the alien to a new random neighbor city
-			if a.invadeRandomNeighbor(nextCity) {
-				// The city has been destroyed, and the alien killed
-				notifyCh(ctx, alienKilledCh)
-
-				return
-			}
-
-			// Alien has not been killed, move on to the next town
-			moveCount++
 		}
 	}
 }
@@ -74,16 +83,16 @@ func notifyCh(ctx context.Context, ch chan<- struct{}) {
 	}
 }
 
-// invadeRandomNeighbor attempts to invade a random neighbor
+// siegeRandomNeighbor attempts to siege a random neighbor
 // of the given city.
 // The assumption is that if no suitable neighbor is found (alien is trapped in a city),
 // the alien dies.
-// Returns a flag indicating if the alien died in combat (or loneliness in trapped cities)
-func (a *alien) invadeRandomNeighbor(c *city) bool {
+// Returns the sieged city, if any
+func (a *alien) siegeRandomNeighbor(c *city) *city {
 	if len(c.neighbors) == 0 {
 		// There are no neighbors the alien can move to,
 		// so the alien dies
-		return true
+		return nil
 	}
 
 	// Seed the random number generator
@@ -96,22 +105,20 @@ func (a *alien) invadeRandomNeighbor(c *city) bool {
 		randNeighbor := c.neighbors[direction(rand.Intn(numDirections))]
 
 		if randNeighbor == nil {
-			// Invalid direction selected, try again
+			// No neighbor in this direction, try again
 			continue
 		}
 
-		// Attempt to invade the random neighbor
-		if randNeighbor.addInvader(a.id) {
-			// Managed to invade, remove the alien from the current city
-			c.removeInvader(a.id)
-
-			// Check if the alien died in combat
-			return !randNeighbor.isAccessible()
+		// Attempt to lay siege to the random neighbor
+		if !randNeighbor.laySiege(a.id) {
+			continue
 		}
+
+		return randNeighbor
 	}
 
 	// There are no suitable neighbors present to which
-	// the alien can move to. It is assumed that the alien dies in this
+	// the alien can lay siege to. It is assumed that the alien dies in this
 	// situation
-	return true
+	return nil
 }

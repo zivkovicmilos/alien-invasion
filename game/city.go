@@ -64,6 +64,7 @@ type city struct {
 
 	destroyed bool             // flag indicating if the city has been destroyed
 	invaders  map[int]struct{} // set of currently present invaders
+	sieges    map[int]struct{} // set of currently present sieges. Sieges act as "reservations" for invasions
 }
 
 // withLogger sets a specific city logger
@@ -79,6 +80,7 @@ func newCity(name string, opts ...func(*city)) *city {
 		name:      name,
 		neighbors: make(map[direction]*city),
 		invaders:  make(map[int]struct{}),
+		sieges:    make(map[int]struct{}),
 		log:       hclog.NewNullLogger(),
 	}
 
@@ -105,7 +107,7 @@ func (c *city) removeNeighbor(direction direction) {
 // neighbors of a given city
 func (c *city) hasAccessibleNeighbors() bool {
 	for _, neighbor := range c.neighbors {
-		if neighbor.isAccessible() {
+		if neighbor.isDestroyed() {
 			return true
 		}
 	}
@@ -119,15 +121,14 @@ func (c *city) hasAccessibleNeighbors() bool {
 //   - the city has not already been destroyed
 //   - the city doesn't have 2 invaders present
 // [Thread safe]
-func (c *city) addInvader(alienID int) bool {
+func (c *city) addInvader(alienID int) {
 	c.Lock()
 	defer c.Unlock()
 
-	// Check if invasion is possible
-	if c.destroyed || c.numInvaders() == maxInvaderCount {
-		// The city is already destroyed, or there are already 2 invaders present.
-		// The assumption is that there can be no more than 2 invaders at any given time in a city
-		return false
+	// Check if this alien has laid siege beforehand
+	_, hasSiege := c.sieges[alienID]
+	if !hasSiege {
+		return
 	}
 
 	// Increase the number of invaders in a city
@@ -139,21 +140,36 @@ func (c *city) addInvader(alienID int) bool {
 		c.destroyed = true
 		c.printInvaders()
 	}
-
-	return true
 }
 
-// removeInvader removes an invader from the city [Thread safe]
-func (c *city) removeInvader(alienID int) {
+// removeInvader removes an invader from the city.
+// Returns a flag indicating if the removal was successful
+// [Thread safe]
+func (c *city) removeInvader(alienID int) bool {
 	c.Lock()
 	defer c.Unlock()
 
+	// Check if the city has been destroyed
+	if c.destroyed {
+		// Aliens can't leave a destroyed city
+		// because they are dead
+		return false
+	}
+
 	delete(c.invaders, alienID)
+	delete(c.sieges, alienID)
+
+	return true
 }
 
 // numInvaders returns the number of active invaders [NOT Thread safe]
 func (c *city) numInvaders() int {
 	return len(c.invaders)
+}
+
+// numSieges returns the number of active sieges [NOT Thread safe]
+func (c *city) numSieges() int {
+	return len(c.sieges)
 }
 
 // printInvaders prints the current invaders in the city [NOT Thread safe]
@@ -176,11 +192,34 @@ func (c *city) printInvaders() {
 	)
 }
 
-// isAccessible returns a flag indicating if a city has been
-// destroyed or if there are two invaders present (is travel-able) [Thread safe]
-func (c *city) isAccessible() bool {
+// isDestroyed returns a flag indicating if a city has been
+// destroyed (is travel-able) [Thread safe]
+func (c *city) isDestroyed() bool {
 	c.RLock()
 	defer c.RUnlock()
 
-	return !c.destroyed && c.numInvaders() != maxInvaderCount
+	return !c.destroyed
+}
+
+// laySiege attempts to lay siege on the city.
+// Returns a flag indicating if the siege was successful
+func (c *city) laySiege(id int) bool {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.numSieges() == 2 {
+		return false
+	}
+
+	c.sieges[id] = struct{}{}
+
+	return true
+}
+
+// liftSiege removes a siege from the city
+func (c *city) liftSiege(id int) {
+	c.Lock()
+	defer c.Unlock()
+
+	delete(c.sieges, id)
 }

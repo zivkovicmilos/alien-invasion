@@ -228,9 +228,8 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 
 	// Set the aliens loose on the Earth map
 	var (
-		aliensLeft       = numAliens
-		movesCompletedCh = make(chan struct{})
-		alienKilledCh    = make(chan struct{})
+		aliensLeft  = numAliens
+		alienDoneCh = make(chan struct{})
 
 		wg sync.WaitGroup
 	)
@@ -244,8 +243,7 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 		cancelFn()
 		wg.Wait()
 
-		close(alienKilledCh)
-		close(movesCompletedCh)
+		close(alienDoneCh)
 
 		// Prune out the destroyed cities
 		m.log.Info(
@@ -260,7 +258,7 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 	// and kick off the invasion process for that alien
 	for id, randomCity := range randomCities {
 		// Attempt to add the alien as an invader
-		if !randomCity.addInvader(id) {
+		if !randomCity.laySiege(id) {
 			// The alien could not be added, because the city
 			// is not accessible. The assumption is that aliens that cannot
 			// be added to their initially assigned cities are not accounted for.
@@ -270,6 +268,8 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 
 			continue
 		}
+
+		randomCity.addInvader(id)
 
 		wg.Add(1)
 
@@ -282,8 +282,7 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 			newAlien(id).runAlien(
 				workerContext,
 				startingCity,
-				movesCompletedCh,
-				alienKilledCh,
+				alienDoneCh,
 			)
 		}(workerContext, id, randomCity)
 	}
@@ -296,21 +295,11 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 			m.log.Info("Shutdown signal caught...")
 
 			return
-		case <-movesCompletedCh:
-			// An alien has reached the max number of moves
+		case <-alienDoneCh:
 			aliensLeft--
 
 			if aliensLeft == 0 {
-				m.log.Info("The final alien moved 10k times")
-
-				return
-			}
-		case <-alienKilledCh:
-			// An alien has been killed
-			aliensLeft--
-
-			if aliensLeft == 0 {
-				m.log.Info("The final alien has been killed")
+				m.log.Info("The final alien has finished")
 
 				return
 			}

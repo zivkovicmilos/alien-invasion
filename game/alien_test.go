@@ -10,7 +10,7 @@ import (
 )
 
 // TestAlien_InvadeRandomNeighbor verifies that the alien
-// can successfully invade a random city neighbor
+// can successfully siege and invade a random city neighbor
 func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 	t.Parallel()
 
@@ -26,16 +26,14 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 		name    string
 		refCity *city
 
-		shouldDie    bool
-		shouldInvade bool
+		expectedNeighbor *city
 	}{
 		{
 			"No neighbors",
 			&city{
 				neighbors: neighbors{},
 			},
-			true,
-			false,
+			nil,
 		},
 		{
 			"No valid neighbors",
@@ -44,8 +42,7 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 					north: invalidCity,
 				},
 			},
-			true,
-			false,
+			nil,
 		},
 		{
 			"Valid neighbor",
@@ -54,8 +51,7 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 					north: validCity,
 				},
 			},
-			false, // the valid city doesn't have any invaders / is not destroyed
-			true,
+			validCity,
 		},
 	}
 
@@ -65,35 +61,43 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Make sure the alien is properly killed off
+			// Make sure the alien can siege a city
+			siegedNeighbor := newAlien(alienID).siegeRandomNeighbor(testCase.refCity)
 			assert.Equal(
 				t,
-				testCase.shouldDie,
-				newAlien(alienID).invadeRandomNeighbor(testCase.refCity),
+				testCase.expectedNeighbor,
+				siegedNeighbor,
 			)
 
 			// Make sure the alien is in the correct city
-			if testCase.shouldInvade {
+			if testCase.expectedNeighbor != nil {
 				// Make sure the invader is removed from the start city
+				assert.True(t, testCase.refCity.removeInvader(alienID))
 				assert.Len(t, testCase.refCity.invaders, 0)
+				assert.Len(t, testCase.refCity.sieges, 0)
 
 				// Make sure the invader is added to the end city
-				for _, neighbor := range testCase.refCity.neighbors {
-					assert.Len(t, neighbor.invaders, 1)
+				siegedNeighbor.addInvader(alienID)
 
-					for invaderID := range neighbor.invaders {
-						assert.Equal(t, alienID, invaderID)
-					}
+				assert.Len(t, siegedNeighbor.invaders, 1)
+				assert.Len(t, siegedNeighbor.sieges, 1)
+
+				for invaderID := range siegedNeighbor.invaders {
+					assert.Equal(t, alienID, invaderID)
+				}
+
+				for invaderID := range siegedNeighbor.sieges {
+					assert.Equal(t, alienID, invaderID)
 				}
 			}
 		})
 	}
 }
 
-// TestAlien_AlienKilled_CityNotAccessible verifies the main run functionality
+// TestAlien_AlienKilled_StartingCityDestroyed verifies the main run functionality
 // of the alien thread, and that it gets killed off appropriately
 // when it finds itself in a destroyed starting city
-func TestAlien_AlienKilled_CityNotAccessible(t *testing.T) {
+func TestAlien_AlienKilled_StartingCityDestroyed(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -102,8 +106,8 @@ func TestAlien_AlienKilled_CityNotAccessible(t *testing.T) {
 		a            = newAlien(0)
 		invadingCity = newCity("invading city")
 
-		alienKilled   = false
-		alienKilledCh = make(chan struct{})
+		alienDone = false
+		doneCh    = make(chan struct{})
 	)
 
 	// Mark the starting city as destroyed
@@ -122,18 +126,18 @@ func TestAlien_AlienKilled_CityNotAccessible(t *testing.T) {
 
 		select {
 		case <-ctx.Done():
-		case <-alienKilledCh:
-			alienKilled = true
+		case <-doneCh:
+			alienDone = true
 		}
 	}()
 
 	// Start the main loop
-	go a.runAlien(ctx, invadingCity, make(chan struct{}), alienKilledCh)
+	go a.runAlien(ctx, invadingCity, doneCh)
 
 	wg.Wait()
 
 	// Make sure the alien alerted the channel about dying
-	assert.True(t, alienKilled)
+	assert.True(t, alienDone)
 }
 
 // TestAlien_AlienKilled_MaxMovesReached verifies the main run functionality
@@ -149,8 +153,8 @@ func TestAlien_AlienKilled_MaxMovesReached(t *testing.T) {
 		invadingCity         = newCity("invading city")
 		invadingCityNeighbor = newCity("invading city neighbor")
 
-		maxMovesReached   = false
-		maxMovesReachedCh = make(chan struct{})
+		alienDone   = false
+		alienDoneCh = make(chan struct{})
 	)
 
 	// Create 2 cities that the alien will move through
@@ -176,18 +180,22 @@ func TestAlien_AlienKilled_MaxMovesReached(t *testing.T) {
 
 		select {
 		case <-ctx.Done():
-		case <-maxMovesReachedCh:
-			maxMovesReached = true
+		case <-alienDoneCh:
+			alienDone = true
 		}
 	}()
 
 	// Start the main loop
-	go a.runAlien(ctx, invadingCity, maxMovesReachedCh, make(chan struct{}))
+	go a.runAlien(ctx, invadingCity, alienDoneCh)
 
 	wg.Wait()
 
 	// Make sure the alien alerted the channel about dying
-	assert.True(t, maxMovesReached)
+	assert.True(t, alienDone)
+
+	// Make sure the cities have not been destroyed
+	assert.False(t, invadingCity.destroyed)
+	assert.False(t, invadingCityNeighbor.destroyed)
 }
 
 // TestAlien_AlienKilled_CityInvaded verifies the main run functionality
@@ -202,13 +210,15 @@ func TestAlien_AlienKilled_CityInvaded(t *testing.T) {
 		a            = newAlien(0)
 		invadingCity = newCity("invading city")
 
-		alienKilled   = false
-		alienKilledCh = make(chan struct{})
+		alienDone   = false
+		alienDoneCh = make(chan struct{})
 	)
 
 	// Make sure the neighbor city has at least one invader
 	neighbor := newCity("neighbor with invader")
-	neighbor.invaders[1] = struct{}{}
+
+	neighbor.laySiege(1)
+	neighbor.addInvader(1)
 
 	invadingCity.neighbors = neighbors{
 		north: neighbor,
@@ -227,16 +237,75 @@ func TestAlien_AlienKilled_CityInvaded(t *testing.T) {
 
 		select {
 		case <-ctx.Done():
-		case <-alienKilledCh:
-			alienKilled = true
+		case <-alienDoneCh:
+			alienDone = true
 		}
 	}()
 
 	// Start the main loop
-	go a.runAlien(ctx, invadingCity, make(chan struct{}), alienKilledCh)
+	go a.runAlien(ctx, invadingCity, alienDoneCh)
 
 	wg.Wait()
 
 	// Make sure the alien alerted the channel about dying
-	assert.True(t, alienKilled)
+	assert.True(t, alienDone)
+
+	// Make sure the city has been destroyed
+	assert.True(t, neighbor.destroyed)
+}
+
+// TestAlien_AlienKilled_CitySiegedNotInvaded verifies the main run functionality
+// of the alien thread, and that it gets killed off appropriately
+// when it sieges a city, but cannot leave the current one (doesn't invade it)
+func TestAlien_AlienKilled_CitySiegedNotInvaded(t *testing.T) {
+	t.Parallel()
+
+	var (
+		wg sync.WaitGroup
+
+		a            = newAlien(0)
+		invadingCity = newCity("invading city")
+
+		alienDone   = false
+		alienDoneCh = make(chan struct{})
+	)
+
+	// Make sure the neighbor city is valid
+	neighbor := newCity("valid neighbor")
+
+	invadingCity.neighbors = neighbors{
+		north: neighbor,
+	}
+
+	// Make sure the current city the alien is in is destroyed
+	invadingCity.destroyed = true
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	// Create a listener thread
+	wg.Add(1)
+
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+
+		select {
+		case <-ctx.Done():
+		case <-alienDoneCh:
+			alienDone = true
+		}
+	}()
+
+	// Start the main loop
+	go a.runAlien(ctx, invadingCity, alienDoneCh)
+
+	wg.Wait()
+
+	// Make sure the alien alerted the channel about dying
+	assert.True(t, alienDone)
+
+	// Make sure the siege is removed
+	assert.Len(t, neighbor.sieges, 0)
 }

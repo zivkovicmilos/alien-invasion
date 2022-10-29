@@ -149,9 +149,9 @@ func TestCity_Direction(t *testing.T) {
 	}
 }
 
-// TestCity_AddInvader makes sure invaders
-// are properly added to the city
-func TestCity_AddInvader(t *testing.T) {
+// TestCity_Invade makes sure invaders
+// can properly lay siege and invade the city
+func TestCity_Invade(t *testing.T) {
 	t.Parallel()
 
 	testTable := []struct {
@@ -195,18 +195,30 @@ func TestCity_AddInvader(t *testing.T) {
 			c := newCity("city name")
 
 			// Add initial invaders
-			for invader := range testCase.initialInvaders {
-				assert.True(t, c.addInvader(invader))
+			for _, invader := range testCase.initialInvaders {
+				assert.True(t, c.laySiege(invader))
+
+				c.addInvader(invader)
 			}
 
 			// Make sure all initial invaders are present
 			assert.Equal(t, len(testCase.initialInvaders), c.numInvaders())
 
-			// Attempt to add the invader
-			invaderAdded := c.addInvader(testCase.invader)
+			// Attempt to lay siege
+			assert.Equal(t, testCase.shouldAddInvader, c.laySiege(testCase.invader))
 
-			// Check if the invader was added
-			assert.Equal(t, testCase.shouldAddInvader, invaderAdded)
+			c.addInvader(testCase.invader)
+
+			// Make sure the number of invaders is correct
+			expectedInvaders := len(testCase.initialInvaders)
+			if testCase.shouldAddInvader {
+				expectedInvaders++
+			}
+
+			assert.Len(t, c.invaders, expectedInvaders)
+
+			// Check if the number of sieges is correct
+			assert.Len(t, c.sieges, expectedInvaders)
 
 			// Check if the city was destroyed
 			assert.Equal(t, testCase.shouldDestroyCity, c.destroyed)
@@ -219,57 +231,20 @@ func TestCity_AddInvader(t *testing.T) {
 func TestCity_RemoveInvader(t *testing.T) {
 	t.Parallel()
 
-	var (
-		c        = newCity("city name")
-		invaders = []int{0, 1}
-	)
-
-	// Add initial invaders
-	for invader := range invaders {
-		assert.True(t, c.addInvader(invader))
-	}
-
-	// Remove the first invader
-	c.removeInvader(invaders[0])
-
-	// Make sure the invader has been removed
-	assert.Equal(t, c.numInvaders(), len(invaders)-1)
-}
-
-// TestCity_Accessible checks that the city is accessible
-// under specific circumstances
-func TestCity_Accessible(t *testing.T) {
-	t.Parallel()
-
 	testTable := []struct {
-		name      string
-		invaders  []int
-		destroyed bool
+		name     string
+		invaders []int
 
-		shouldBeAccessible bool
+		shouldRemoveInvader bool
 	}{
 		{
-			"accessible city without invaders",
-			[]int{},
-			false,
-			true,
-		},
-		{
-			"accessible city with single invader",
+			"single invader",
 			[]int{0},
-			false,
 			true,
 		},
 		{
-			"non-accessible city with 2 invaders",
+			"destroyed city",
 			[]int{0, 1},
-			false,
-			false,
-		},
-		{
-			"non-accessible destroyed city",
-			[]int{},
-			true,
 			false,
 		},
 	}
@@ -283,14 +258,76 @@ func TestCity_Accessible(t *testing.T) {
 			c := newCity("city name")
 
 			// Add initial invaders
-			for invader := range testCase.invaders {
-				assert.True(t, c.addInvader(invader))
+			for index, invader := range testCase.invaders {
+				assert.True(t, c.laySiege(invader))
+
+				c.addInvader(invader)
+
+				assert.Len(t, c.invaders, index+1)
 			}
 
-			c.destroyed = testCase.destroyed
+			// Remove the first invader
+			assert.Equal(t, testCase.shouldRemoveInvader, c.removeInvader(testCase.invaders[0]))
+
+			expectedInvaders := len(testCase.invaders)
+			if testCase.shouldRemoveInvader {
+				expectedInvaders--
+			}
+
+			// Make sure the number of invaders and sieges is correct
+			assert.Equal(t, expectedInvaders, c.numInvaders())
+			assert.Equal(t, expectedInvaders, c.numSieges())
+		})
+	}
+}
+
+// TestCity_Accessible checks that the city is accessible
+// under specific circumstances
+func TestCity_Accessible(t *testing.T) {
+	t.Parallel()
+
+	testTable := []struct {
+		name     string
+		invaders []int
+
+		shouldBeDestroyed bool
+	}{
+		{
+			"accessible city without invaders",
+			[]int{},
+			true,
+		},
+		{
+			"accessible city with single invader",
+			[]int{0},
+			true,
+		},
+		{
+			"non-accessible city with 2 invaders",
+			[]int{0, 1},
+			false,
+		},
+	}
+
+	for _, testCase := range testTable {
+		testCase := testCase
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newCity("city name")
+
+			// Add initial invaders
+			for index, invader := range testCase.invaders {
+				assert.True(t, c.laySiege(invader))
+
+				c.addInvader(invader)
+
+				assert.Len(t, c.invaders, index+1)
+			}
 
 			// Check if the city is accessible
-			assert.Equal(t, testCase.shouldBeAccessible, c.isAccessible())
+			assert.Equal(t, testCase.shouldBeDestroyed, c.isDestroyed())
 		})
 	}
 }
@@ -302,6 +339,9 @@ func TestCity_AccessibleNeighbors(t *testing.T) {
 
 	// Create an occupied neighbor
 	occupiedNeighbor := newCity("occupied")
+	occupiedNeighbor.laySiege(0)
+	occupiedNeighbor.laySiege(1)
+
 	occupiedNeighbor.addInvader(0)
 	occupiedNeighbor.addInvader(1)
 
