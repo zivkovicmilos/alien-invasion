@@ -250,7 +250,7 @@ func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
 		// Prune out the destroyed cities
 		m.log.Info(
 			fmt.Sprintf(
-				"A total of %d cities were destroyed during runtime!",
+				"A total of %d cities were destroyed during runtime",
 				m.pruneDestroyedCities(),
 			),
 		)

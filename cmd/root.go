@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
+	"sync"
+	"syscall"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
@@ -111,6 +114,12 @@ func runPreRun(_ *cobra.Command, args []string) error {
 
 // runCommand runs the root command
 func runCommand(_ *cobra.Command, _ []string) error {
+	// Create an instance of the file reader
+	fileReader, err := stream.NewFileReader(params.mapPath)
+	if err != nil {
+		return fmt.Errorf("unable to create a file reader, %w", err)
+	}
+
 	// Create an instance of the logger
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:  "alien-invasion",
@@ -120,27 +129,51 @@ func runCommand(_ *cobra.Command, _ []string) error {
 	// Create an instance of the Earth map
 	earthMap := game.NewEarthMap(logger)
 
-	// Create an instance of the file reader
-	fileReader, err := stream.NewFileReader(params.mapPath)
-	if err != nil {
-		return fmt.Errorf("unable to create a file reader, %w", err)
-	}
-
 	// Init the map from the map file
 	earthMap.InitMap(fileReader)
 
 	// Simulate the invasion
-	earthMap.SimulateInvasion(context.Background(), params.n)
+	var (
+		wg                 sync.WaitGroup
+		simulationComplete = make(chan struct{})
+	)
+
+	// The assumption is that very large invasion simulations
+	// can take an arbitrary amount of time, depending on the map size
+	// and alien count. In order to possibly prevent this, system-wide cancel
+	// signals are monitored (CTRL-C, etc)
+	simulationCtx, cancelSimulation := context.WithCancel(context.Background())
+	defer cancelSimulation()
+
+	wg.Add(1)
+
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+
+		earthMap.SimulateInvasion(simulationCtx, params.n)
+		close(simulationComplete)
+	}()
+
+	// Wait for either the simulation to complete,
+	// or the user to exit
+	select {
+	// Get the system-wide signal handler
+	case <-getTerminationSignalCh():
+		// Shut down the simulation
+		cancelSimulation()
+	// Wait for the simulation to complete
+	case <-simulationComplete:
+	}
+
+	// Wait for the simulation to gracefully exit
+	wg.Wait()
 
 	// Set up the output writer
-	writer := stream.NewConsoleWriter()
-	if params.outputPath != "" {
-		// Output file is set, make sure it is valid
-		writer, err = stream.NewFileWriter(params.outputPath)
-
-		if err != nil {
-			return fmt.Errorf("unable to create an output file, %w", err)
-		}
+	writer, err := getOutputWriter()
+	if err != nil {
+		return err
 	}
 
 	// Write the invasion output to the file
@@ -151,4 +184,39 @@ func runCommand(_ *cobra.Command, _ []string) error {
 	logger.Info("Invasion completed successfully!")
 
 	return nil
+}
+
+// getOutputWriter returns the appropriate output writer
+// based on user preferences
+func getOutputWriter() (stream.OutputWriter, error) {
+	var (
+		err error
+
+		writer = stream.NewConsoleWriter()
+	)
+
+	if params.outputPath != "" {
+		// Output file is set, make sure it is valid
+		writer, err = stream.NewFileWriter(params.outputPath)
+
+		if err != nil {
+			return nil, fmt.Errorf("unable to create an output file, %w", err)
+		}
+	}
+
+	return writer, nil
+}
+
+// getTerminationSignalCh returns a listen channel for
+// system-wide stop signals
+func getTerminationSignalCh() <-chan os.Signal {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(
+		signalCh,
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGHUP,
+	)
+
+	return signalCh
 }
