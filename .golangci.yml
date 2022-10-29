@@ -6,7 +6,7 @@ run:
   skip-dirs-use-default: true
 
 service:
-  golangci-lint-version: latest
+  golangci-lint-version: 1.49.0
 
 linters:
   disable-all: true
@@ -35,7 +35,3 @@ linters:
     - dupl # Code clone detection
     - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error
     - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13
-
-linters-settings:
-  gofmt:
-    simplify: false
