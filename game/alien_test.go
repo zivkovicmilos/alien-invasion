@@ -71,6 +71,10 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 
 			// Make sure the alien is in the correct city
 			if testCase.expectedNeighbor != nil {
+				if siegedNeighbor == nil {
+					t.Fatal("neighbor should be sieged, but isn't")
+				}
+
 				// Make sure the invader is removed from the start city
 				assert.True(t, testCase.refCity.removeInvader(alienID))
 				assert.Len(t, testCase.refCity.invaders, 0)
@@ -92,6 +96,46 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAlien_NonSiegeableCities verifies that the alien
+// cannot successfully siege any city neighbor
+func TestAlien_NonSiegeableCities(t *testing.T) {
+	t.Parallel()
+
+	// Make sure all neighbors can't be sieged, but
+	// are valid (not destroyed)
+	neighbor := newCity("neighbor city")
+
+	neighbor.sieges[0] = struct{}{}
+	neighbor.sieges[1] = struct{}{}
+
+	currentCity := newCity("current city")
+	currentCity.neighbors = neighbors{
+		north: neighbor,
+	}
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func(c *city) {
+		defer func() {
+			wg.Done()
+		}()
+
+		// After some time, all accessible neighbor cities become destroyed
+		<-time.After(time.Second)
+
+		c.addInvader(0)
+		c.addInvader(1)
+	}(neighbor)
+
+	siegedNeighbor := newAlien(0).siegeRandomNeighbor(currentCity)
+
+	wg.Wait()
+
+	assert.Nil(t, siegedNeighbor)
 }
 
 // TestAlien_AlienKilled_StartingCityDestroyed verifies the main run functionality

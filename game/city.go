@@ -107,7 +107,7 @@ func (c *city) removeNeighbor(direction direction) {
 // neighbors of a given city
 func (c *city) hasAccessibleNeighbors() bool {
 	for _, neighbor := range c.neighbors {
-		if neighbor.isDestroyed() {
+		if !neighbor.isDestroyed() {
 			return true
 		}
 	}
@@ -198,7 +198,7 @@ func (c *city) isDestroyed() bool {
 	c.RLock()
 	defer c.RUnlock()
 
-	return !c.destroyed
+	return c.destroyed
 }
 
 // laySiege attempts to lay siege on the city.

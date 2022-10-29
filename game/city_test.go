@@ -295,17 +295,17 @@ func TestCity_Accessible(t *testing.T) {
 		{
 			"accessible city without invaders",
 			[]int{},
-			true,
+			false,
 		},
 		{
 			"accessible city with single invader",
 			[]int{0},
-			true,
+			false,
 		},
 		{
 			"non-accessible city with 2 invaders",
 			[]int{0, 1},
-			false,
+			true,
 		},
 	}
 
@@ -361,7 +361,6 @@ func TestCity_AccessibleNeighbors(t *testing.T) {
 		{
 			"no valid neighbors",
 			neighbors{
-				north: occupiedNeighbor,
 				south: destroyedNeighbor,
 			},
 			false,

@@ -98,7 +98,7 @@ func (a *alien) siegeRandomNeighbor(c *city) *city {
 	// Seed the random number generator
 	rand.Seed(time.Now().UnixNano())
 
-	// While there are still valid neighbors, attempt to invade
+	// While there are still valid neighbors, attempt to siege
 	// them randomly
 	for c.hasAccessibleNeighbors() {
 		//nolint:gosec
