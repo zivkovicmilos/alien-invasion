@@ -3,9 +3,7 @@ package game
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -103,38 +101,6 @@ func (c *city) removeNeighbor(direction direction) {
 	delete(c.neighbors, direction)
 }
 
-// getRandomNeighbor returns a random city neighbor that is present (and travel-able!).
-// If no neighbors are present, it returns nil
-func (c *city) getRandomNeighbor() *city {
-	if len(c.neighbors) == 0 {
-		// There are no neighbors present
-		return nil
-	}
-
-	// Seed the random number generator
-	rand.Seed(time.Now().UnixNano())
-
-	// Get a random present neighbor
-	getRandCity := func() *city {
-		//nolint:gosec
-		randNeighbor := c.neighbors[direction(rand.Intn(numDirections))]
-
-		if randNeighbor != nil && !randNeighbor.isAccessible() {
-			// Neighbor can not be travelled to
-			return nil
-		}
-
-		return randNeighbor
-	}
-
-	randCity := getRandCity()
-	for randCity == nil && c.hasAccessibleNeighbors() {
-		randCity = getRandCity()
-	}
-
-	return randCity
-}
-
 // hasAccessibleNeighbors checks travel is possible to
 // neighbors of a given city
 func (c *city) hasAccessibleNeighbors() bool {
@@ -148,7 +114,7 @@ func (c *city) hasAccessibleNeighbors() bool {
 }
 
 // addInvader adds an invader to the specified city.
-// It returns a flag indicating if the invader was killed.
+// It returns a flag indicating if the invader was added.
 // The alien can invade a city if:
 //   - the city has not already been destroyed
 //   - the city doesn't have 2 invaders present
@@ -167,14 +133,12 @@ func (c *city) addInvader(alienID int) bool {
 	// Increase the number of invaders in a city
 	c.invaders[alienID] = struct{}{}
 
-	if c.numInvaders() != 2 {
-		// There are no two invaders in the city
-		return false
+	// Check if the city is destroyed
+	if c.numInvaders() == 2 {
+		// Mark the city as destroyed, print the invaders
+		c.destroyed = true
+		c.printInvaders()
 	}
-
-	// Mark the city as destroyed, print the invaders
-	c.destroyed = true
-	c.printInvaders()
 
 	return true
 }

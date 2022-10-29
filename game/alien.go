@@ -2,22 +2,21 @@ package game
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/hashicorp/go-hclog"
+	"math/rand"
+	"time"
 )
 
 // alien defines the single alien instance
 type alien struct {
-	id  int
-	log hclog.Logger
+	id int
+
+	currentCity *city
 }
 
 // newAlien creates a new alien instance
-func newAlien(id int, logger hclog.Logger) *alien {
+func newAlien(id int) *alien {
 	return &alien{
-		id:  id,
-		log: logger.Named(fmt.Sprintf("alien %d", id)),
+		id: id,
 	}
 }
 
@@ -33,15 +32,18 @@ func (a *alien) runAlien(
 		nextCity  = startingCity
 	)
 
-	defer func() {
-		a.log.Info("Finished!")
-	}()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
+			// Check if the current city has been destroyed
+			if !nextCity.isAccessible() {
+				notifyCh(ctx, alienKilledCh)
+
+				return
+			}
+
 			// Check if max moves have been reached
 			if moveCount >= maxMoveCount {
 				notifyCh(ctx, movesCompletedCh)
@@ -49,27 +51,16 @@ func (a *alien) runAlien(
 				return
 			}
 
-			// Increase the move count
-			moveCount++
-
-			// Attempt to move the alien to the city
-			if nextCity.addInvader(a.id) {
+			// Attempt to move the alien to a new random neighbor city
+			if a.invadeRandomNeighbor(nextCity) {
 				// The city has been destroyed, and the alien killed
 				notifyCh(ctx, alienKilledCh)
 
 				return
 			}
 
-			// Get a new random neighboring city
-			nextCity = nextCity.getRandomNeighbor()
-			if nextCity == nil {
-				// No more active neighbors, the alien is trapped with nowhere to go.
-				// The assumption is that the alien dies here. An alternative would be to
-				// pick a new random city for "teleportation", assuming the alien is advanced enough
-				notifyCh(ctx, alienKilledCh)
-
-				return
-			}
+			// Alien has not been killed, move on to the next town
+			moveCount++
 		}
 	}
 }
@@ -83,4 +74,36 @@ func notifyCh(ctx context.Context, ch chan<- struct{}) {
 	case ch <- struct{}{}:
 		return
 	}
+}
+
+// invadeRandomNeighbor
+func (a *alien) invadeRandomNeighbor(c *city) bool {
+	if len(c.neighbors) == 0 || !c.hasAccessibleNeighbors() {
+		// There are no suitable neighbors present
+		return true
+	}
+
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// While there are still valid neighbors, attempt to invade
+	// them randomly
+	for c.hasAccessibleNeighbors() {
+		//nolint:gosec
+		randNeighbor := c.neighbors[direction(rand.Intn(numDirections))]
+
+		if randNeighbor == nil {
+			continue
+		}
+
+		// Attempt to invade the random neighbor
+		if randNeighbor.addInvader(a.id) {
+			// Managed to invade, remove the alien from the current city
+			c.removeInvader(a.id)
+
+			return !randNeighbor.isAccessible()
+		}
+	}
+
+	return true
 }

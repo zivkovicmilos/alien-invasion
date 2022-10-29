@@ -103,55 +103,6 @@ func TestCity_RemoveNeighbors(t *testing.T) {
 	assert.Len(t, city.neighbors, len(neighbors)/2)
 }
 
-func TestCity_GetRandomNeighbor(t *testing.T) {
-	t.Parallel()
-
-	testTable := []struct {
-		name         string
-		neighbors    []*city
-		expectResult bool
-	}{
-		{
-			"no valid neighbors",
-			generateRandomCities(0),
-			false,
-		},
-		{
-			"valid random neighbor",
-			generateRandomCities(numDirections),
-			true,
-		},
-	}
-
-	for _, testCase := range testTable {
-		testCase := testCase
-
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Create a reference city
-			city := newCity("city name")
-
-			for index, neighbor := range testCase.neighbors {
-				// Grab a random direction
-				direction := direction(index % numDirections)
-
-				// Add the neighbor
-				city.addNeighbor(direction, neighbor)
-			}
-
-			// Get a random neighbor
-			randomNeighbor := city.getRandomNeighbor()
-
-			if testCase.expectResult {
-				assert.NotNil(t, randomNeighbor)
-			} else {
-				assert.Nil(t, randomNeighbor)
-			}
-		})
-	}
-}
-
 // TestCity_Direction makes sure the direction helper methods work fine
 func TestCity_Direction(t *testing.T) {
 	t.Parallel()

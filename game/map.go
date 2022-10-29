@@ -178,13 +178,13 @@ func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 		var sb strings.Builder
 
 		// Write the city name
-		sb.WriteString(fmt.Sprintf("%s ", city.name))
+		sb.WriteString(fmt.Sprintf("%s", city.name))
 
 		// For each direction, write the neighbor with the direction
 		for direction, neighbor := range city.neighbors {
 			sb.WriteString(
 				fmt.Sprintf(
-					"%s=%s",
+					" %s=%s",
 					direction.getName(),
 					neighbor.name,
 				),
@@ -222,34 +222,53 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 	)
 
 	workerContext, cancelFn := context.WithCancel(ctx)
-	defer cancelFn()
 
 	// Cleanup
 	defer func() {
+		// Close off the alien routines, and wait
+		// for them to complete gracefully
+		cancelFn()
+		wg.Wait()
+
 		close(alienKilledCh)
 		close(movesCompletedCh)
+
+		// Prune out the destroyed cities
+		m.log.Info(
+			fmt.Sprintf(
+				"A total of %d cities were destroyed!",
+				m.pruneDestroyedCities(),
+			),
+		)
 	}()
 
 	// Start the alien run loops
-	for i := 0; i < numAliens; i++ {
+	for id, randomCity := range randomCities {
+		if !randomCity.addInvader(id) {
+			aliensLeft--
+
+			continue
+		}
+
+		wg.Add(1)
 		go func(ctx context.Context, id int, startingCity *city) {
 			defer func() {
 				wg.Done()
 			}()
 
-			newAlien(id, m.log).runAlien(
+			newAlien(id).runAlien(
 				workerContext,
 				startingCity,
 				movesCompletedCh,
 				alienKilledCh,
 			)
-		}(workerContext, i, randomCities[i])
+		}(workerContext, id, randomCity)
 	}
 
 	// Prune out the destroyed cities
 	m.log.Info(
 		fmt.Sprintf(
-			"A total of %d cities were destroyed!",
+			"A total of %d cities were destroyed during initialization!",
 			m.pruneDestroyedCities(),
 		),
 	)
@@ -260,11 +279,6 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 		case <-ctx.Done():
 			// User stopped the program
 			m.log.Info("Shutdown signal caught...")
-
-			// Close off the alien routines, and wait
-			// for them to complete gracefully
-			cancelFn()
-			wg.Wait()
 
 			return nil
 		case <-movesCompletedCh:
