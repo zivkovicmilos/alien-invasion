@@ -129,10 +129,8 @@ func runCommand(_ *cobra.Command, _ []string) error {
 	// Init the map from the map file
 	earthMap.InitMap(fileReader)
 
-	// Start the invasion
-	if err := earthMap.StartInvasion(context.Background(), params.n); err != nil {
-		return fmt.Errorf("unable to simulate invasion, %w", err)
-	}
+	// Simulate the invasion
+	earthMap.SimulateInvasion(context.Background(), params.n)
 
 	// Set up the output writer
 	writer := stream.NewConsoleWriter()

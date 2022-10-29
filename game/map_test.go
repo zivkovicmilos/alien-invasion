@@ -1,8 +1,10 @@
 package game
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -375,4 +377,131 @@ func TestMap_PruneDestroyedCities(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestMap_SimulateInvasion_SingleAlien runs the alien invasion simulation
+// using a single alien. During the simulation, no cities should be destroyed,
+// as the alien is alone on the map
+func TestMap_SimulateInvasion_SingleAlien(t *testing.T) {
+	t.Parallel()
+
+	var (
+		m     = NewEarthMap(hclog.NewNullLogger())
+		cityA = newCity("city A")
+		cityB = newCity("city B")
+	)
+
+	// Create 2 cities that the alien will move through
+	// until it reaches max moves
+	cityA.neighbors = neighbors{
+		north: cityB,
+	}
+
+	cityB.neighbors = neighbors{
+		south: cityA,
+	}
+
+	// Add the cities to the world map
+	m.addCity(cityA)
+	m.addCity(cityB)
+
+	// Start the simulation with a single alien
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	m.SimulateInvasion(ctx, 1)
+
+	// Make sure no cities were destroyed
+	assert.Len(t, m.cityMap, 2)
+}
+
+// TestMap_SimulateInvasion_MultipleAliens runs the alien invasion simulation
+// using a multiple alien. During the simulation, some cities should be destroyed,
+// as the aliens are not alone on the map
+func TestMap_SimulateInvasion_MultipleAliens(t *testing.T) {
+	t.Parallel()
+
+	var (
+		m     = NewEarthMap(hclog.NewNullLogger())
+		cityA = newCity("city A")
+		cityB = newCity("city B")
+	)
+
+	// Create 2 cities that the alien will move through
+	// until it reaches max moves
+	cityA.neighbors = neighbors{
+		north: cityB,
+	}
+
+	cityB.neighbors = neighbors{
+		south: cityA,
+	}
+
+	// Add the cities to the world map
+	m.addCity(cityA)
+	m.addCity(cityB)
+
+	// Start the simulation with multiple aliens
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	m.SimulateInvasion(ctx, 2)
+
+	// Make sure one city was destroyed
+	assert.Len(t, m.cityMap, 1)
+}
+
+// TestMap_SimulateInvasion_ManyAliens runs the alien invasion simulation
+// using many aliens. During the simulation, all cities should be destroyed,
+// as the number of aliens is vastly greater than the number of cities
+func TestMap_SimulateInvasion_ManyAliens(t *testing.T) {
+	t.Parallel()
+
+	var (
+		m     = NewEarthMap(hclog.NewNullLogger())
+		cityA = newCity("city A")
+		cityB = newCity("city B")
+	)
+
+	// Create 2 cities that the alien will move through
+	// until it reaches max moves
+	cityA.neighbors = neighbors{
+		north: cityB,
+	}
+
+	cityB.neighbors = neighbors{
+		south: cityA,
+	}
+
+	// Add the cities to the world map
+	m.addCity(cityA)
+	m.addCity(cityB)
+
+	// Start the simulation with many aliens
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	m.SimulateInvasion(ctx, 30)
+
+	// Make sure all cities were destroyed
+	assert.Len(t, m.cityMap, 0)
+}
+
+// TestMap_SimulateInvasion_EmptyMap is a simple sanity test
+// for verifying that the simulation handles empty maps correctly
+func TestMap_SimulateInvasion_EmptyMap(t *testing.T) {
+	t.Parallel()
+
+	var (
+		m = NewEarthMap(hclog.NewNullLogger())
+	)
+
+	// Start the simulation with a single alien
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	m.SimulateInvasion(ctx, 1)
+
+	// Make sure the city map is unchanged
+	assert.Len(t, m.cityMap, 0)
 }

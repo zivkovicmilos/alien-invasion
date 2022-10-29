@@ -172,6 +172,11 @@ func (m *EarthMap) getOrAddCity(name string) *city {
 // WriteOutput writes the current map layout to the specified
 // output stream. It assumes that the output order is not important
 func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
+	// Check if there are any cities left to output
+	if len(m.cityMap) == 0 {
+		m.log.Info("All cities were destroyed by mad aliens")
+	}
+
 	// Each city has an output format:
 	// CityName direction=CityName...
 	for _, city := range m.cityMap {
@@ -196,10 +201,10 @@ func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 		}
 	}
 
-	return nil
+	return writer.Flush()
 }
 
-// StartInvasion starts the invasion simulation using the provided number of aliens.
+// SimulateInvasion starts the invasion simulation using the provided number of aliens.
 // The invasion consists of a few steps:
 // 1. Randomly assign starting positions for aliens
 // 2. Set the aliens loose on the Earth map
@@ -208,7 +213,16 @@ func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 //    - all aliens moved at least 10k times (solves the "trapped" scenarios)
 //    - the user terminated the program with an exit signal (CTRL-C)
 // 4. Prune out destroyed cities from the map
-func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
+func (m *EarthMap) SimulateInvasion(ctx context.Context, numAliens int) {
+	// Check if there are cities on the map for the invasion
+	if len(m.cityMap) == 0 {
+		// There are no cities on the earth map for aliens
+		// to destroy, so the simulation terminates
+		m.log.Error("There are no cities for the mad aliens to invade")
+
+		return
+	}
+
 	// Randomly assign starting positions for aliens
 	randomCities := m.getRandomCities(numAliens)
 
@@ -236,15 +250,22 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 		// Prune out the destroyed cities
 		m.log.Info(
 			fmt.Sprintf(
-				"A total of %d cities were destroyed!",
+				"A total of %d cities were destroyed during runtime!",
 				m.pruneDestroyedCities(),
 			),
 		)
 	}()
 
-	// Start the alien run loops
+	// For each random city, attempt to add an invader,
+	// and kick off the invasion process for that alien
 	for id, randomCity := range randomCities {
+		// Attempt to add the alien as an invader
 		if !randomCity.addInvader(id) {
+			// The alien could not be added, because the city
+			// is not accessible. The assumption is that aliens that cannot
+			// be added to their initially assigned cities are not accounted for.
+			// An alternative approach would be to grab a new random city for each alien
+			// in this situation (reassign them to a new random city)
 			aliensLeft--
 
 			continue
@@ -252,6 +273,7 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 
 		wg.Add(1)
 
+		// Start the alien run loop
 		go func(ctx context.Context, id int, startingCity *city) {
 			defer func() {
 				wg.Done()
@@ -266,14 +288,6 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 		}(workerContext, id, randomCity)
 	}
 
-	// Prune out the destroyed cities
-	m.log.Info(
-		fmt.Sprintf(
-			"A total of %d cities were destroyed during initialization!",
-			m.pruneDestroyedCities(),
-		),
-	)
-
 	// Wait until the program terminates
 	for {
 		select {
@@ -281,7 +295,7 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 			// User stopped the program
 			m.log.Info("Shutdown signal caught...")
 
-			return nil
+			return
 		case <-movesCompletedCh:
 			// An alien has reached the max number of moves
 			aliensLeft--
@@ -289,7 +303,7 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 			if aliensLeft == 0 {
 				m.log.Info("The final alien moved 10k times")
 
-				return nil
+				return
 			}
 		case <-alienKilledCh:
 			// An alien has been killed
@@ -298,7 +312,7 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 			if aliensLeft == 0 {
 				m.log.Info("The final alien has been killed")
 
-				return nil
+				return
 			}
 		}
 	}
