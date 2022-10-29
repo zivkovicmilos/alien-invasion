@@ -30,16 +30,16 @@ Flags:
 Running a simulation with `3` aliens using the map example below in [the input section](#input):
 
 ```
-$ alien-invasion 3 --map-path ./mapfile.txt
-2022-10-29T19:11:38.272+0200 [INFO]  alien-invasion.earth-map: Map initialized with 5 cities
-2022-10-29T19:11:38.273+0200 [INFO]  alien-invasion.earth-map.Bar: City has been destroyed by aliens 1 and 2!
-2022-10-29T19:11:38.361+0200 [INFO]  alien-invasion.earth-map: The final alien moved 10k times
-2022-10-29T19:11:38.361+0200 [INFO]  alien-invasion.earth-map: A total of 1 cities were destroyed
-Foo south=Qu-ux west=Baz
-Qu-ux north=Foo
-Baz east=Foo
-Bee
-2022-10-29T19:11:38.361+0200 [INFO]  alien-invasion: Invasion completed successfully!
+$ alien-invasion 3 --map-path ./mapfile.txt                    
+2022-10-29T21:58:14.705+0200 [INFO]  alien-invasion.earth-map: Map initialized with 5 cities
+2022-10-29T21:58:14.706+0200 [INFO]  alien-invasion.earth-map.Baz: City has been destroyed by aliens 1 and 2!
+2022-10-29T21:58:14.794+0200 [INFO]  alien-invasion.earth-map: The final alien has finished
+2022-10-29T21:58:14.794+0200 [INFO]  alien-invasion.earth-map: A total of 1 cities were destroyed
+Bee east=Bar                                                                                     
+Foo north=Bar south=Qu-ux                                                                        
+Bar south=Foo west=Bee                                                                           
+Qu-ux north=Foo                                                                                  
+2022-10-29T21:58:14.794+0200 [INFO]  alien-invasion: Invasion completed successfully!
 ```
 
 ### Input

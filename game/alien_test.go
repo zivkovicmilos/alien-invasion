@@ -131,10 +131,12 @@ func TestAlien_NonSiegeableCities(t *testing.T) {
 		c.addInvader(1)
 	}(neighbor)
 
+	// Attempt to siege a random neighbor
 	siegedNeighbor := newAlien(0).siegeRandomNeighbor(currentCity)
 
 	wg.Wait()
 
+	// Make sure no neighbor is sieged
 	assert.Nil(t, siegedNeighbor)
 }
 
