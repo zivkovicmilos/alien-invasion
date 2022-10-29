@@ -111,6 +111,8 @@ func (a *alien) siegeRandomNeighbor(c *city) *city {
 
 		// Attempt to lay siege to the random neighbor
 		if !randNeighbor.laySiege(a.id) {
+			// Unable to lay siege to the neighbor, even though
+			// they are a viable candidate
 			continue
 		}
 
