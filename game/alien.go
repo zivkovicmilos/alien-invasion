@@ -74,10 +74,15 @@ func notifyCh(ctx context.Context, ch chan<- struct{}) {
 	}
 }
 
-// invadeRandomNeighbor
+// invadeRandomNeighbor attempts to invade a random neighbor
+// of the given city.
+// The assumption is that if no suitable neighbor is found (alien is trapped in a city),
+// the alien dies.
+// Returns a flag indicating if the alien died in combat (or loneliness in trapped cities)
 func (a *alien) invadeRandomNeighbor(c *city) bool {
-	if len(c.neighbors) == 0 || !c.hasAccessibleNeighbors() {
-		// There are no suitable neighbors present
+	if len(c.neighbors) == 0 {
+		// There are no neighbors the alien can move to,
+		// so the alien dies
 		return true
 	}
 
@@ -91,6 +96,7 @@ func (a *alien) invadeRandomNeighbor(c *city) bool {
 		randNeighbor := c.neighbors[direction(rand.Intn(numDirections))]
 
 		if randNeighbor == nil {
+			// Invalid direction selected, try again
 			continue
 		}
 
@@ -99,9 +105,13 @@ func (a *alien) invadeRandomNeighbor(c *city) bool {
 			// Managed to invade, remove the alien from the current city
 			c.removeInvader(a.id)
 
+			// Check if the alien died in combat
 			return !randNeighbor.isAccessible()
 		}
 	}
 
+	// There are no suitable neighbors present to which
+	// the alien can move to. It is assumed that the alien dies in this
+	// situation
 	return true
 }
