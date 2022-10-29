@@ -1,4 +1,3 @@
-//nolint:unused
 package game
 
 import (
@@ -11,7 +10,8 @@ import (
 type direction int
 
 const (
-	numDirections = 4
+	numDirections   = 4 // There are only 4 directions
+	maxInvaderCount = 2 // There can only be 2 invaders at the same time
 )
 
 // Possible directions
@@ -58,12 +58,12 @@ type neighbors map[direction]*city
 type city struct {
 	sync.RWMutex
 
-	name      string
-	neighbors neighbors
-	log       hclog.Logger
+	name      string       // the name of the city
+	neighbors neighbors    // the adjacent neighboring cities
+	log       hclog.Logger // a logger instance
 
-	destroyed bool
-	invaders  map[int]struct{}
+	destroyed bool             // flag indicating if the city has been destroyed
+	invaders  map[int]struct{} // set of currently present invaders
 }
 
 // withLogger sets a specific city logger
@@ -113,7 +113,7 @@ func (c *city) hasAccessibleNeighbors() bool {
 	return false
 }
 
-// addInvader adds an invader to the specified city.
+// addInvader adds an invader to the city.
 // It returns a flag indicating if the invader was added.
 // The alien can invade a city if:
 //   - the city has not already been destroyed
@@ -124,7 +124,7 @@ func (c *city) addInvader(alienID int) bool {
 	defer c.Unlock()
 
 	// Check if invasion is possible
-	if c.destroyed || c.numInvaders() == 2 {
+	if c.destroyed || c.numInvaders() == maxInvaderCount {
 		// The city is already destroyed, or there are already 2 invaders present.
 		// The assumption is that there can be no more than 2 invaders at any given time in a city
 		return false
@@ -134,7 +134,7 @@ func (c *city) addInvader(alienID int) bool {
 	c.invaders[alienID] = struct{}{}
 
 	// Check if the city is destroyed
-	if c.numInvaders() == 2 {
+	if c.numInvaders() == maxInvaderCount {
 		// Mark the city as destroyed, print the invaders
 		c.destroyed = true
 		c.printInvaders()
@@ -156,7 +156,7 @@ func (c *city) numInvaders() int {
 	return len(c.invaders)
 }
 
-// printInvaders prints the current invaders in the city. [NOT Thread safe]
+// printInvaders prints the current invaders in the city [NOT Thread safe]
 func (c *city) printInvaders() {
 	invaders := make([]int, len(c.invaders))
 
@@ -176,11 +176,11 @@ func (c *city) printInvaders() {
 	)
 }
 
-// isDestroyed returns a flag indicating if a city has been
-// destroyed or if there are two invaders present [Thread safe]
+// isAccessible returns a flag indicating if a city has been
+// destroyed or if there are two invaders present (is travel-able) [Thread safe]
 func (c *city) isAccessible() bool {
 	c.RLock()
 	defer c.RUnlock()
 
-	return !c.destroyed && len(c.invaders) != 2
+	return !c.destroyed && c.numInvaders() != maxInvaderCount
 }

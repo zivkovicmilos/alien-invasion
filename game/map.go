@@ -178,7 +178,7 @@ func (m *EarthMap) WriteOutput(writer stream.OutputWriter) error {
 		var sb strings.Builder
 
 		// Write the city name
-		sb.WriteString(fmt.Sprintf("%s", city.name))
+		sb.WriteString(city.name)
 
 		// For each direction, write the neighbor with the direction
 		for direction, neighbor := range city.neighbors {
@@ -251,6 +251,7 @@ func (m *EarthMap) StartInvasion(ctx context.Context, numAliens int) error {
 		}
 
 		wg.Add(1)
+
 		go func(ctx context.Context, id int, startingCity *city) {
 			defer func() {
 				wg.Done()

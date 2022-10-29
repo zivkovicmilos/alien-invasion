@@ -9,8 +9,6 @@ import (
 // alien defines the single alien instance
 type alien struct {
 	id int
-
-	currentCity *city
 }
 
 // newAlien creates a new alien instance
