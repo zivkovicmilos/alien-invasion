@@ -1,7 +1,10 @@
 package game
 
 import (
+	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -85,4 +88,152 @@ func TestAlien_InvadeRandomNeighbor(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAlien_AlienKilled_CityNotAccessible verifies the main run functionality
+// of the alien thread, and that it gets killed off appropriately
+// when it finds itself in a destroyed starting city
+func TestAlien_AlienKilled_CityNotAccessible(t *testing.T) {
+	t.Parallel()
+
+	var (
+		wg sync.WaitGroup
+
+		a            = newAlien(0)
+		invadingCity = newCity("invading city")
+
+		alienKilled   = false
+		alienKilledCh = make(chan struct{})
+	)
+
+	// Mark the starting city as destroyed
+	invadingCity.destroyed = true
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	// Create a listener thread
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+
+		select {
+		case <-ctx.Done():
+		case <-alienKilledCh:
+			alienKilled = true
+		}
+	}()
+
+	// Start the main loop
+	go a.runAlien(ctx, invadingCity, make(chan struct{}), alienKilledCh)
+
+	wg.Wait()
+
+	// Make sure the alien alerted the channel about dying
+	assert.True(t, alienKilled)
+}
+
+// TestAlien_AlienKilled_MaxMovesReached verifies the main run functionality
+// of the alien thread, and that it gets killed off appropriately
+// when it reaches the maximum number of moves
+func TestAlien_AlienKilled_MaxMovesReached(t *testing.T) {
+	t.Parallel()
+
+	var (
+		wg sync.WaitGroup
+
+		a                    = newAlien(0)
+		invadingCity         = newCity("invading city")
+		invadingCityNeighbor = newCity("invading city neighbor")
+
+		maxMovesReached   = false
+		maxMovesReachedCh = make(chan struct{})
+	)
+
+	// Create 2 cities that the alien will move through
+	// until it reaches max moves
+	invadingCity.neighbors = neighbors{
+		north: invadingCityNeighbor,
+	}
+
+	invadingCityNeighbor.neighbors = neighbors{
+		south: invadingCity,
+	}
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	// Create a listener thread
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+
+		select {
+		case <-ctx.Done():
+		case <-maxMovesReachedCh:
+			maxMovesReached = true
+		}
+	}()
+
+	// Start the main loop
+	go a.runAlien(ctx, invadingCity, maxMovesReachedCh, make(chan struct{}))
+
+	wg.Wait()
+
+	// Make sure the alien alerted the channel about dying
+	assert.True(t, maxMovesReached)
+}
+
+// TestAlien_AlienKilled_CityInvaded verifies the main run functionality
+// of the alien thread, and that it gets killed off appropriately
+// when it invades a city and encounters another alien
+func TestAlien_AlienKilled_CityInvaded(t *testing.T) {
+	t.Parallel()
+
+	var (
+		wg sync.WaitGroup
+
+		a            = newAlien(0)
+		invadingCity = newCity("invading city")
+
+		alienKilled   = false
+		alienKilledCh = make(chan struct{})
+	)
+
+	// Make sure the neighbor city has at least one invader
+	neighbor := newCity("neighbor with invader")
+	neighbor.invaders[1] = struct{}{}
+
+	invadingCity.neighbors = neighbors{
+		north: neighbor,
+	}
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+
+	// Create a listener thread
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+
+		select {
+		case <-ctx.Done():
+		case <-alienKilledCh:
+			alienKilled = true
+		}
+	}()
+
+	// Start the main loop
+	go a.runAlien(ctx, invadingCity, make(chan struct{}), alienKilledCh)
+
+	wg.Wait()
+
+	// Make sure the alien alerted the channel about dying
+	assert.True(t, alienKilled)
 }
